@@ -18,43 +18,45 @@ docker.getEvents((err, stream) => {
   }
 
   stream.on("data", async (data) => {
-    const event = JSON.parse(data.toString());
+    try {
+      const event = JSON.parse(data.toString());
 
-    if (event.Type === "container" && event.Action === "start") {
-      console.log(`Container ${event.Actor.Attributes.name} has started`);
-      const container = docker.getContainer(event.id);
+      if (event.Type === "container" && event.Action === "start") {
+        console.log(`Container ${event.Actor.Attributes.name} has started`);
+        const container = docker.getContainer(event.id);
 
-      const containerInfo = await container.inspect();
-      const containerName = containerInfo.Name.substring(1);
-      const ipAddress = containerInfo.NetworkSettings.IPAddress;
+        const containerInfo = await container.inspect();
+        const containerName = containerInfo.Name.substring(1);
+        const ipAddress = containerInfo.NetworkSettings.IPAddress;
 
-      const exposedPorts = Object.keys(containerInfo.Config.ExposedPorts);
+        const exposedPorts = Object.keys(containerInfo.Config.ExposedPorts);
 
-      if (!exposedPorts && !exposedPorts.length) {
-        console.log("[Error] No exposed ports found");
-        return;
+        if (!exposedPorts && !exposedPorts.length) {
+          console.log("[Error] No exposed ports found");
+          return;
+        }
+
+        console.log(exposedPorts);
+
+        const [port, type] = exposedPorts[0].split("/");
+        console.log(`Exposed port: ${port} (${type})`);
+
+        if (type !== "tcp") {
+          console.log("[Error] Only TCP ports are supported but got", type);
+          return;
+        }
+
+        console.log(
+          `Registering ${containerName}.localhost --> ${ipAddress}:${port}`
+        );
+
+        db.set(containerName, {
+          ipAddress,
+          port,
+        });
       }
-
-      console.log(exposedPorts);
-      
-
-      const [port, type] = exposedPorts[0].split("/");
-      console.log(`Exposed port: ${port} (${type})`);
-      
-
-      if (type !== "tcp") {
-        console.log("[Error] Only TCP ports are supported but got", type);
-        return;
-      }
-
-      console.log(
-        `Registering ${containerName}.localhost --> ${ipAddress}:${port}`
-      );
-
-      db.set(containerName, {
-        ipAddress,
-        port,
-      });
+    } catch (error) {
+      console.error(error);
     }
   });
 
@@ -81,10 +83,25 @@ reverseProxyApp.use((req, res) => {
 
   console.log(`Forwarding ${hostname} --> ${target}`);
 
-  return proxy.web(req, res, { target, changeOrigin: true });
+  return proxy.web(req, res, { target, changeOrigin: true, ws: true });
 });
 
 const reverseProxy = http.createServer(reverseProxyApp);
+
+reverseProxy.on("upgrade", (req, socket, head) => {
+  const hostname = req.headers.host;
+  const subDomain = hostname.split(".")[0];
+
+  if (!db.has(subDomain)) {
+    return res.status(404).send("Not found");
+  }
+
+  const { ipAddress, port } = db.get(subDomain);
+
+  const target = `http://${ipAddress}:${port}`;
+
+  return proxy.ws(req, socket, head, { target, ws: true });
+});
 
 reverseProxy.listen(reverseProxyPort, () => {
   console.log(`Reverse proxy listening on port ${reverseProxyPort}`);
