@@ -1,5 +1,6 @@
 import express from "express";
 import { docker } from "../docker-events.js";
+import { getAllFromDb } from "../db.js";
 
 export const managementAPIServer = async () => {
   const managementAPI = express();
@@ -41,6 +42,12 @@ export const managementAPIServer = async () => {
       image: `${image}:${tag}`,
       url: `http://${containerName}.localhost:80/`,
     });
+  });
+
+  managementAPI.get("/containers", async (req, res) => {
+    const containers = getAllFromDb();
+
+    return res.json(containers);
   });
 
   managementAPI.listen(managementAPIPort, () => {

@@ -14,17 +14,15 @@ const registerContainer = async (event) => {
   const exposedPorts = Object.keys(containerInfo.Config.ExposedPorts);
 
   if (!exposedPorts && !exposedPorts.length) {
-    console.log("[Error] No exposed ports found");
+    console.error("[Error] No exposed ports found");
     return;
   }
-
-  console.log(exposedPorts);
 
   const [port, type] = exposedPorts[0].split("/");
   console.log(`Exposed port: ${port} (${type})`);
 
   if (type !== "tcp") {
-    console.log("[Error] Only TCP ports are supported but got", type);
+    console.error("[Error] Only TCP ports are supported but got", type);
     return;
   }
 
@@ -33,6 +31,9 @@ const registerContainer = async (event) => {
   );
 
   setInDb(containerName, {
+    containerName,
+    image: `${containerInfo.Config.Image}`,
+    url: `http://${containerName}.localhost/`,
     ipAddress,
     port,
   });
@@ -55,10 +56,6 @@ export async function dockerEventListeners() {
       } catch (error) {
         console.error(error);
       }
-    });
-
-    stream.on("end", () => {
-      console.log("Docker event stream ended");
     });
   });
 }

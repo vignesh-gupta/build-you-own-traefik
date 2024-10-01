@@ -1,7 +1,7 @@
 import express from "express";
 import httpProxy from "http-proxy";
 import http from "http";
-import { db, getFromDb, hasInDb } from "./db.js";
+import { getFromDb, hasInDb } from "./db.js";
 
 const proxy = httpProxy.createProxy({});
 
@@ -14,24 +14,21 @@ export const reverseProxyServer = () => {
     const subDomain = hostname.split(".")[0];
 
     if (!hasInDb(subDomain)) {
-      console.log(`Cannot Find ${subDomain} in the database`);
       return null;
     }
 
-    const { ipAddress, port } = db.get(subDomain);
+    const { ipAddress, port } = getFromDb(subDomain);
 
     return `http://${ipAddress}:${port}`;
   };
 
   reverseProxyApp.use((req, res) => {
-    console.log(req.hostname);
-
     const hostname = req.hostname;
 
     const target = getTarget(hostname);
     if (!target) return res.status(404).send("Not found");
 
-    console.log(`Forwarding ${hostname} --> ${target}`);
+    console.log(`Forwarding http://${hostname} --> ${target}`);
 
     return proxy.web(req, res, { target, changeOrigin: true, ws: true });
   });
