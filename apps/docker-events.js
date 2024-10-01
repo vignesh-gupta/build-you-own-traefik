@@ -31,7 +31,8 @@ const registerContainer = async (event) => {
   );
 
   setInDb(containerName, {
-    containerName,
+    id: container.id,
+    name: containerName,
     image: `${containerInfo.Config.Image}`,
     url: `http://${containerName}.localhost/`,
     ipAddress,

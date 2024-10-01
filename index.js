@@ -1,6 +1,6 @@
-import { dockerEventListeners } from "./utils/docker-events.js";
-import { managementAPIServer } from "./utils/management-api/index.js";
-import { reverseProxyServer } from "./utils/reverse-proxy-server.js";
+import { dockerEventListeners } from "./apps/docker-events.js";
+import { managementAPIServer } from "./apps/management-api/index.js";
+import { reverseProxyServer } from "./apps/reverse-proxy-server.js";
 
 // Docker Events
 dockerEventListeners();
