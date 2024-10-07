@@ -1,5 +1,5 @@
 import Docker from "dockerode";
-import { setInDb } from "./db.js";
+import { removeFromDb, setInDb } from "./db.js";
 
 export const docker = new Docker();
 
@@ -40,6 +40,14 @@ const registerContainer = async (event) => {
   });
 };
 
+const unregisterContainer = async (event) => {
+  console.log(`Container ${event.Actor.Attributes.name} has stopped`);
+  const containerName = event.Actor.Attributes.name;
+  console.log(`Removing ${containerName}.localhost`);
+
+  removeFromDb(containerName);
+};
+
 export async function dockerEventListeners() {
   docker.getEvents((err, stream) => {
     if (err) {
@@ -47,12 +55,23 @@ export async function dockerEventListeners() {
       return;
     }
 
-    stream.on("data", async (data) => {
+    stream.on("data", (data) => {
       try {
         const event = JSON.parse(data.toString());
 
-        if (event.Type === "container" && event.Action === "start") {
-          await registerContainer(event);
+        if (event.Type === "container") {
+          switch (event.Action) {
+            case "start":
+              registerContainer(event);
+              break;
+            case "stop":
+              unregisterContainer(event);
+              break;
+            default:
+              console.log(
+                `${event.Action} is not supported yet for containers`
+              );
+          }
         }
       } catch (error) {
         console.error(error);
